@@ -2,6 +2,9 @@
 #include <SDL2/SDL_events.h>
 #include <SDL2/SDL_mouse.h>
 #include <SDL2/SDL_pixels.h>
+#include <SDL2/SDL_rect.h>
+#include <SDL2/SDL_render.h>
+#include <SDL2/SDL_stdinc.h>
 #include <SDL2/SDL_surface.h>
 #include <SDL2/SDL_timer.h>
 #include <SDL2/SDL_video.h>
@@ -10,13 +13,26 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define WIDTH 900
+#include "line_drawing_alg.h"
+
+#define RAYS_NUMBER 100
+
+#define WIDTH 1500
 #define HEIGHT 600
+#define LENGTH (int)(sqrt((WIDTH) * (WIDTH) + (HEIGHT) * (HEIGHT)))
 
 struct Circle {
-	double x;
-	double y;
+	int x;
+	int y;
 	double radius;
+};
+
+struct Ray {
+	int start_x;
+	int start_y;
+	double angle;
+	int end_x;
+	int end_y;
 };
 
 void FillCircle(SDL_Surface *surface, struct Circle circle, Uint32 color) {
@@ -33,21 +49,49 @@ void FillCircle(SDL_Surface *surface, struct Circle circle, Uint32 color) {
 	};
 }
 
+void find_angles(struct Circle circle, struct Ray rays[RAYS_NUMBER]) {
+	for (int i = 0; i < RAYS_NUMBER; ++i) {
+		double deg = 360.0 * i / RAYS_NUMBER;
+		double theta = deg * M_PI / 180.0;
+
+		rays[i].angle = theta;
+	}
+}
+
+void find_rays(struct Circle circle, struct Ray rays[RAYS_NUMBER]) {
+	for (int i = 0; i < RAYS_NUMBER; ++i) {
+		rays[i].start_x = circle.x;
+		rays[i].start_y = circle.y;
+		rays[i].end_x = circle.x + LENGTH * sin(rays[i].angle);
+		rays[i].end_y = circle.y + LENGTH * cos(rays[i].angle);
+	}
+}
+
+void draw_rays(struct Ray rays[RAYS_NUMBER], SDL_Surface *surface, Uint32 color) {
+	for (int i = 0; i < RAYS_NUMBER; ++i) {
+		bresennhams_alg(rays[i].start_x, rays[i].start_y, rays[i].end_x, rays[i].end_y, surface, color, HEIGHT, WIDTH);
+	}
+}
+
 int main(int argc, char **args) {
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
 		printf("Init Error %s\n", SDL_GetError());
 		return 1;
 	}
-
 	SDL_Window *window =
 	    SDL_CreateWindow("Raytracing", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_SHOWN);
 	SDL_Surface *screen_surface = SDL_GetWindowSurface(window);
 	SDL_Delay(2000);
 
-	struct Circle circle = {200, 200, 100};
-
+	struct Circle circle = {-200, -200, 30};
+	struct Circle circle_shadow = {(WIDTH / 5) * 4, (HEIGHT / 5) * 2, 120};
+	SDL_Rect erase_rect = {0, 0, WIDTH, HEIGHT};
 	bool isWindowOpen = true;
 	SDL_Event event;
+
+	struct Ray rays[RAYS_NUMBER];
+	find_angles(circle, rays);
+	find_rays(circle, rays);
 
 	while (isWindowOpen) {
 		while (SDL_PollEvent(&event)) {
@@ -55,12 +99,17 @@ int main(int argc, char **args) {
 				isWindowOpen = false;
 			}
 			if (event.type == SDL_MOUSEMOTION && event.motion.state != 0) {
-				isWindowOpen = false;
+				circle.x = event.motion.x;
+				circle.y = event.motion.y;
+				find_rays(circle, rays);
 			}
 		}
-		FillCircle(screen_surface, circle, 0xAA15EE);
+		SDL_FillRect(screen_surface, &erase_rect, 0x000000);
+		FillCircle(screen_surface, circle, 0xFFFFFF);
+		draw_rays(rays, screen_surface, 0xFFFFFF);
+		FillCircle(screen_surface, circle_shadow, 0xFFFFFF);
+
 		SDL_UpdateWindowSurface(window);
-		SDL_Delay(20);
 	}
 
 	SDL_DestroyWindow(window);
