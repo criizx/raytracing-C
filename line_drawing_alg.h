@@ -8,4 +8,6 @@
 #include <SDL2/SDL_timer.h>
 #include <SDL2/SDL_video.h>
 
+#include "structs.h"
+
 void bresennhams_alg(int x0, int y0, int x1, int y1, SDL_Surface *surface, Uint32 color, int HEIGHT, int WIDTH);
